@@ -1,0 +1,2 @@
+estrat-hilbert uses Hibert R-trees to provide efficient lookup for rectangles.
+Its author is Eric Stratmann (estrat).
