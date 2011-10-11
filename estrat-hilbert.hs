@@ -1,13 +1,18 @@
+import HilbertTree
 import System.Environment
 
-data Rectangle = Rectangle Integer Integer Integer Integer deriving Show
 
 main :: IO ()
 main = do
     fileRectangles <- readRectanglesFile
     inputRectangles <- readRectanglesStdin
+    let tree = buildTree fileRectangles
+    let _n = map (searchTree tree) inputRectangles
     return ()
 
+
+findRectangles :: HilbertTree -> [Rectangle] -> IO ()
+findRectangles tree rects = return ()
 
 readRectanglesStdin :: IO [Rectangle]
 readRectanglesStdin = do
