@@ -6,6 +6,8 @@ data Point = Point Integer Integer deriving (Show, Eq)
 type NodeData = (Rectangle, HilbertTree, Integer)
 data HilbertTree = Node [(NodeData)] | Leaf [Rectangle] deriving (Show, Eq)
 
+maxRectCoord = 66536
+
 emptyTree :: HilbertTree
 emptyTree = Node []
 
@@ -50,10 +52,23 @@ generateMBR :: Rectangle -> Rectangle -> Rectangle
 generateMBR (Rectangle  xl xh yl yh)  (Rectangle xl2 xh2 yl2 yh2) = 
     Rectangle (min xl xl2) (max xh xh2) (min xl xl2) (max xh xh2)
 
--- placeholder definition
 hilbert :: Rectangle -> Integer
-hilbert rect = div (x + y) 2 where
-    (Point x y) = center rect
+hilbert rect = hilbert' d x y where
+    d = ceiling $ logBase 4 (maxRectCoord ** 2)
+    Point x y = center rect
+
+-- I have no idea why (or if) this works
+hilbert' :: Integer -> Integer -> Integer -> Integer
+hilbert' d x y = dist (2^(d-1)) (2^(2*(d-1))) 0 x y where
+    dist 0 _ result _ _ = result
+    dist side area result x y
+        | x < side && y < side = dist newDist newArea result y x
+        | x < side = dist newDist newArea (result + area) x (y - side)
+        | y < side = dist newDist newArea (result + area * 3) (side - y - 1) (side * 2 - x -1)
+        | otherwise = dist newDist newArea (result + area * 2) (x - side) (y - side)
+        where newDist = div side 2
+              newArea = div area 4
+        
 
 center :: Rectangle -> Point
 center (Rectangle xl xh yl yh) = Point (div (xh+xl) 2) (div (yh+yl) 2)
