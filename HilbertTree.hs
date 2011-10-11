@@ -3,6 +3,7 @@ import Data.List
 
 data Rectangle = Rectangle Integer Integer Integer Integer deriving (Show, Eq)
 data Point = Point Integer Integer deriving (Show, Eq)
+-- (MBR, Child, LHV)
 type NodeData = (Rectangle, HilbertTree, Integer)
 data HilbertTree = Node [(NodeData)] | Leaf [Rectangle] deriving (Show, Eq)
 
@@ -12,13 +13,31 @@ emptyTree :: HilbertTree
 emptyTree = Node []
 
 buildTree :: [Rectangle] -> HilbertTree
-buildTree rects =  foldl' insertTree (Leaf []) []
+buildTree rects =  foldl' insertTree emptyTree rects
 
 insertTree :: HilbertTree -> Rectangle -> HilbertTree
 insertTree (Node []) rect = Node [(rect, Leaf [rect], hilbert rect)]
-insertTree (Node nodes) rect = Node (update nodes b (insertTree best rect))
+insertTree (Node nodes) rect = fix $ Node (update nodes b (insertTree best rect))
     where b@(_,best,_) = findBestNode nodes rect
 insertTree (Leaf rects) rect = Leaf (rect:rects)
+
+
+fix :: HilbertTree -> HilbertTree
+fix (Node nodes) = Node $ map fixNode nodes
+fix tree = tree
+
+fixNode :: NodeData -> NodeData
+fixNode (_, child, _) = (mbr, child, lhv) where
+    mbr = getNodeNBR child
+    lhv = getNodeLHV child
+
+getNodeMBR :: HilbertTree -> Rectangle
+getNodeMBR (Node nodes) = getMBR $ map (\(mbr,_,_) -> mbr) nodes
+getNodeNBR (Leaf rects) = getMBR rects
+
+getNodeLHV :: HilbertTree -> Integer
+getNodeLHV (Node nodes) = maximum $ map (\(_,_,lhv) -> lhv) nodes
+getNodeLHV (Leaf rects) = maximum $ map hilbert rects
 
 update :: [NodeData] -> NodeData -> HilbertTree -> [NodeData]
 update (n:ns) node@(rect, _, lhv) tree | n == node = (rect, tree, lhv) : update ns node tree
@@ -42,11 +61,12 @@ searchTree (Leaf leafs) rect = concatMap searchTree'' leafs where
 
 
 intersects (Rectangle xl xh yl yh) (Rectangle xl2 xh2 yl2 yh2) = 
-    not $ xl2 > xh || xh2 < xl || yh2 > yl || yl2 < yh
+    not $ xl2 > xh || xh2 < xl || yh2 < yl || yl2 > yh
 
 getMBR :: [Rectangle] -> Rectangle
 getMBR rectangles = getMBR' (head rectangles) (tail rectangles) where
         getMBR' mbr (rect:rest) = getMBR' (generateMBR mbr rect) rest
+        getMBR' mbr _ = mbr
 
 generateMBR :: Rectangle -> Rectangle -> Rectangle
 generateMBR (Rectangle  xl xh yl yh)  (Rectangle xl2 xh2 yl2 yh2) = 
