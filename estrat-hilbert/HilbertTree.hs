@@ -3,8 +3,8 @@ import Data.List
 import Data.Ord
 import Debug.Trace
 
+-- XLow, XHigh, YLow, YHigh
 data Rectangle = Rectangle Integer Integer Integer Integer deriving (Eq)
-data Point = Point Integer Integer deriving (Show, Eq)
 -- (MBR, Child, LHV)
 type NodeData = (Rectangle, HilbertTree, Integer)
 data HilbertTree = Node [NodeData] | Leaf [Rectangle] deriving (Eq)
@@ -44,7 +44,7 @@ rall (Node ns) = concatMap (\(_,c,_) -> rall c) ns
 rall (Leaf rs) = rs
 
 getNodes (Node ns) = ns
-----
+---- Constants
 
 maxRectCoord = 66536
 
@@ -53,6 +53,8 @@ maxLeafSize = 2
 
 maxNodeSize :: Int
 maxNodeSize = 2
+
+---- Public functions
 
 emptyTree :: HilbertTree
 emptyTree = Node []
@@ -66,6 +68,15 @@ insertTree tree rect = if ok a then a else error ("Unbalanced!. Before\n" ++ sho
     a = trace ("\n\nNEW INSERT\n\n") (newRoot newTree split)
     (newTree, split) = insertTree' tree rect
     
+searchTree :: HilbertTree -> Rectangle -> [Rectangle]
+searchTree (Node nodes) rect = searchTree' =<< nodes where
+    searchTree' (rect2, tree, _) | intersects rect rect2 = searchTree tree rect
+                                   | otherwise = []
+searchTree (Leaf leafs) rect = searchTree'' =<< leafs where
+    searchTree'' rect2 | intersects rect rect2 = [rect2]
+                       | otherwise = []
+
+---- Private functions
     
 newRoot :: HilbertTree -> Maybe NodeData -> HilbertTree
 newRoot tree (Just newNode) = Node [makeNode tree, makeNode (Node [newNode])]
@@ -175,8 +186,8 @@ fixNode (_, child, _) = (mbr, child, lhv) where
     lhv = getNodeLHV child
 
 getNodeMBR :: HilbertTree -> Rectangle
-getNodeMBR (Node nodes) = getMBR $ fmap (\(mbr,_,_) -> mbr) nodes
-getNodeMBR (Leaf rects) = getMBR rects
+getNodeMBR (Node nodes) = foldl1 calculateMBR $ fmap (\(mbr,_,_) -> mbr) nodes
+getNodeMBR (Leaf rects) = foldl1 calculateMBR rects
 
 getNodeLHV :: HilbertTree -> Integer
 getNodeLHV (Node nodes) = maximum $ fmap (\(_,_,lhv) -> lhv) nodes
@@ -186,32 +197,19 @@ findBestNode (n@(_,_,h):n2:ns) hi | h > hi = n
                                | otherwise = findBestNode (n2:ns) hi
 findBestNode [n] _ = n
 
-searchTree :: HilbertTree -> Rectangle -> [Rectangle]
-searchTree (Node nodes) rect = searchTree' =<< nodes where
-    searchTree' (rect2, tree, _) | intersects rect rect2 = searchTree tree rect
-                                   | otherwise = []
-searchTree (Leaf leafs) rect = searchTree'' =<< leafs where
-    searchTree'' rect2 | intersects rect rect2 = [rect2]
-                       | otherwise = []
 
 intersects :: Rectangle -> Rectangle -> Bool
 intersects (Rectangle xl xh yl yh) (Rectangle xl2 xh2 yl2 yh2) = 
     not $ xl2 > xh || xh2 < xl || yh2 < yl || yl2 > yh
 
-getMBR :: [Rectangle] -> Rectangle
-getMBR [] =  error "getMBR with empty list"
-getMBR rectangles = getMBR' (head rectangles) (tail rectangles) where
-        getMBR' mbr (rect:rest) = getMBR' (generateMBR mbr rect) rest
-        getMBR' mbr _ = mbr
-
-generateMBR :: Rectangle -> Rectangle -> Rectangle
-generateMBR (Rectangle  xl xh yl yh)  (Rectangle xl2 xh2 yl2 yh2) = 
+calculateMBR :: Rectangle -> Rectangle -> Rectangle
+calculateMBR (Rectangle  xl xh yl yh)  (Rectangle xl2 xh2 yl2 yh2) = 
     Rectangle (min xl xl2) (max xh xh2) (min yl yl2) (max yh yh2)
 
 hilbert :: Rectangle -> Integer
 hilbert rect = hilbert' d x y where
     d = ceiling $ logBase 4 (maxRectCoord ** 2)
-    Point x y = center rect
+    (x, y) = center rect
 
 -- I have no idea why (or if) this works
 hilbert' :: Integer -> Integer -> Integer -> Integer
@@ -226,5 +224,5 @@ hilbert' d x y = dist (2^(d-1)) (2^(2*(d-1))) 0 x y where
               newArea = div area 4
         
 
-center :: Rectangle -> Point
-center (Rectangle xl xh yl yh) = Point (div (xh+xl) 2) (div (yh+yl) 2)
+center :: Rectangle -> (Integer, Integer)
+center (Rectangle xl xh yl yh) = (div (xh+xl) 2, div (yh+yl) 2)
