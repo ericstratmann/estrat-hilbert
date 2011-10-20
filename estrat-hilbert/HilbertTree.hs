@@ -1,57 +1,22 @@
 module HilbertTree where
 import Data.List
 import Data.Ord
-import Debug.Trace
 
 -- XLow, XHigh, YLow, YHigh
-data Rectangle = Rectangle Integer Integer Integer Integer deriving (Eq)
+data Rectangle = Rectangle Integer Integer Integer Integer deriving (Show, Eq)
 -- (MBR, Child, (minHilbert, maxHilbert))
 type NodeData = (Rectangle, HilbertTree, (Integer, Integer))
-data HilbertTree = Node [NodeData] | Leaf [Rectangle] deriving (Eq)
+data HilbertTree = Node [NodeData] | Leaf [Rectangle] deriving (Show, Eq)
 
-
-instance Show HilbertTree where
-    show (Node nodes) = "N[" ++ concatMap (\(r,c,_) -> show (hilbert r) ++ ":" ++ show c ++ ",") nodes ++ "]"
-    show (Leaf rects) = "L" ++ show rects
-
-
-instance Show Rectangle where
-    show r@(Rectangle xl xh yl yh) = "r " ++ show xl ++ " " ++ show xh ++ " " ++ show yl ++ " " ++ show yh ++ ":" ++ show (hilbert r)
---    show r = "r" ++ show(hilbert r)
-
-r a b c d = Rectangle a b c d
-----
-tr :: [Rectangle]
-tr = [Rectangle 0 1 0 1, Rectangle 1 2 1 2, Rectangle 3 5 3 5, Rectangle 0 4 0 4]
-
-order tree = if (rall tree == sortBy (comparing hilbert) (rall tree)) then True else error ("not ordered\n" ++ show tree)
-
-ok a = balanced a && allOk a && order a
-
-allOk a = if allOk' a  then True else error "too big nodes"
-allOk' (Node ns) = length (ns) <= maxNodeSize && all (\(_,c,_) -> allOk' c) ns
-allOk' (Leaf rs) = length rs <= maxLeafSize 
-
-balanced :: HilbertTree -> Bool 
-balanced tree = if (1 >= length (group $  mapDepth 0 tree)) then True else error ("inbalanced" ++ show (tree))
-
-mapDepth :: Int -> HilbertTree -> [Int]
-mapDepth d (Node ns) = (\(_,c,_) -> mapDepth (d+1) c) =<< ns
-mapDepth d (Leaf _) = [d]
-
-rall (Node ns) = concatMap (\(_,c,_) -> rall c) ns
-rall (Leaf rs) = rs
-
-getNodes (Node ns) = ns
 ---- Constants
 
 maxRectCoord = 66536
 
 maxLeafSize :: Int
-maxLeafSize = 2
+maxLeafSize = 3
 
 maxNodeSize :: Int
-maxNodeSize = 2
+maxNodeSize = 3
 
 ---- Public functions
 
@@ -83,19 +48,17 @@ newRoot tree Nothing = tree
 
 insertTree' :: HilbertTree -> Rectangle -> (HilbertTree, Maybe NodeData)
 insertTree' (Node []) rect = (Node [(rect, Leaf [rect], (hilbert rect, hilbert rect))], Nothing)
-insertTree' (Node nodes) rect = (Node f1, grow best f2) where
+insertTree' (Node nodes) rect = (Node f1, f2) where
     (f1, f2) = handleOverflow siblings (makeNode newTree) split
     siblings = getSiblings nodes b
     (newTree, split) = insertTree' best rect 
     b@(_,best,_) = findBestNode nodes (hilbert rect)
 insertTree' leaf rect = (insertLeaf leaf rect, Nothing)
 
-grow :: HilbertTree -> Maybe NodeData -> Maybe NodeData
-grow _ x = x
-
 -- Inserts the rectangle into the Leaf. May cause overflow which will be fixed later
 insertLeaf :: HilbertTree -> Rectangle -> HilbertTree
 insertLeaf (Leaf rects) rect = Leaf (sortBy (comparing hilbert) (rect:rects))
+insertLeaf _ _ = error "insertLeaf expects leaf"
 
 --fix (a,b) c = trace (s "vvvvv" ++ s a ++ s b ++ s c ++ s "^^^^^^^") (fix' (a,b) c)
 
@@ -125,7 +88,8 @@ handleOverflowNode (Just newNode) nodes | length allNodes  <= capacity = (distri
     sorted = sortBy compareNodeHilberts allNodes
     distributed = fillD sorted
 
-getChildren = concatMap (\(_,Node ns,_) -> ns) 
+getChildren :: [NodeData] -> [NodeData]
+getChildren = (=<<) (\(_,Node ns,_) -> ns) 
 
 fillD :: [NodeData] -> [NodeData]
 fillD nodes | not $ null nodes = (makeNode . Node $ take maxNodeSize nodes) : fillD (drop maxLeafSize nodes)
@@ -141,13 +105,13 @@ handleOverflowLeaf node siblings | not full = (allNodes, Nothing)
                                  | otherwise = (oldNodes, Just newNode)
     where
     full = any (\(_,Leaf rs,_) -> length rs > maxLeafSize) allNodes
-    allNodes = sortBy (compareNodeHilberts) (node:siblings)
-    allRects = sortBy (comparing hilbert) (getAllRects allNodes)
-    numRects = length allRects
+    allNodes = sortBy compareNodeHilberts (node:siblings)
+    rects = sortBy (comparing hilbert) (getAllRects allNodes)
+    numRects = length rects
     capacity = getCapacity allNodes
     newNode = last distributed
     oldNodes = init distributed
-    distributed = (fill allRects)
+    distributed = fill rects
 
 compareNodeHilberts :: NodeData -> NodeData -> Ordering
 compareNodeHilberts (_,_,h1) (_,_,h2) = compareHilberts h1 h2
@@ -189,7 +153,7 @@ isLeafNode (_,child,_) | isLeaf child = True
 getAllRects :: [NodeData] -> [Rectangle]
 getAllRects = (=<<) (\(_,c,_) -> getRects c) 
 getRects :: HilbertTree -> [Rectangle]
-getRects n@(Node _) = error ("getRects expects Leaf:" ++ show n)
+getRects (Node _) = error "getRects expects Leaf"
 getRects (Leaf rects) = rects
 
 -- children must be leaf nodes
@@ -207,16 +171,17 @@ getNodeMBR (Node nodes) = foldl1 calculateMBR $ fmap (\(mbr,_,_) -> mbr) nodes
 getNodeMBR (Leaf rects) = foldl1 calculateMBR rects
 
 getNodeHilbert :: HilbertTree -> (Integer, Integer)
-getNodeHilbert (Node nodes) = (min, max)
-    where min = minimum $ fmap (\(_,_,(shv,_)) -> shv) nodes
-          max = maximum $ fmap (\(_,_,(_,lhv)) -> lhv) nodes
+getNodeHilbert (Node nodes) = (minH, maxH)
+    where minH = minimum $ fmap (\(_,_,(shv,_)) -> shv) nodes
+          maxH = maximum $ fmap (\(_,_,(_,lhv)) -> lhv) nodes
 getNodeHilbert (Leaf rects) = (minimum hilberts, maximum hilberts)
     where hilberts = fmap hilbert rects
 
+findBestNode :: [NodeData] -> Integer -> NodeData
 findBestNode (n@(_,_,(_,h)):n2:ns) hi | h > hi = n
                                       | otherwise = findBestNode (n2:ns) hi
 findBestNode [n] _ = n
-
+findBestNode _ _ = error "findBestNode expects node"
 
 intersects :: Rectangle -> Rectangle -> Bool
 intersects (Rectangle xl xh yl yh) (Rectangle xl2 xh2 yl2 yh2) = 
@@ -226,12 +191,16 @@ calculateMBR :: Rectangle -> Rectangle -> Rectangle
 calculateMBR (Rectangle  xl xh yl yh)  (Rectangle xl2 xh2 yl2 yh2) = 
     Rectangle (min xl xl2) (max xh xh2) (min yl yl2) (max yh yh2)
 
+allRects :: HilbertTree -> [Rectangle]
+allRects (Node ns) = (\(_,c,_) -> allRects c) =<< ns
+allRects (Leaf rs) = rs
+
 hilbert :: Rectangle -> Integer
 hilbert rect = hilbert' d x y where
     d = ceiling $ logBase 4 (maxRectCoord ** 2)
     (x, y) = center rect
 
--- I have no idea why (or if) this works
+-- Adapted from http://www.serpentine.com/blog/2007/01/11/two-dimensional-spatial-hashing-with-space-filling-curves/
 hilbert' :: Integer -> Integer -> Integer -> Integer
 hilbert' d x y = dist (2^(d-1)) (2^(2*(d-1))) 0 x y where
     dist 0 _ result _ _ = result
