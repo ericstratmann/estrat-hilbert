@@ -1,0 +1,12 @@
+name:  estrat-hilbert
+version: 0.1
+author: Eric Stratmann
+Synopsis: Uses Hilbert trees to effenciently find interesecting rectangles
+cabal-version: >= 1.2
+build-type: Simple
+
+Executable estrat-hilbert
+  Main-Is: estrat-hilbert.hs
+  build-depends:  base, containers
+  Hs-Source-Dirs: estrat-hilbert
+  ghc-options: -Wall -O2
