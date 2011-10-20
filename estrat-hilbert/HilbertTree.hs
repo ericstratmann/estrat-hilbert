@@ -32,11 +32,11 @@ insertTree tree rect = uncurry newRoot (insertTree' tree rect)
     
 searchTree :: HilbertTree -> Rectangle -> [Rectangle]
 searchTree (Node nodes) rect = searchTree' =<< nodes where
-    searchTree' (rect2, tree, _) | intersects rect rect2 = searchTree tree rect
-                                 | otherwise = []
+    searchTree' (mbr, tree, _) | intersects rect mbr = searchTree tree rect
+                               | otherwise = []
 searchTree (Leaf leafs) rect = searchTree'' =<< leafs where
-    searchTree'' rect2 | intersects rect rect2 = [rect2]
-                       | otherwise = []
+    searchTree'' leafRect | intersects rect leafRect = [leafRect]
+                          | otherwise = []
 
 ---- Private functions
     
