@@ -1,7 +1,6 @@
 module HilbertTree where
 import Data.List
 import Data.Ord
-import Control.Monad
 
 -- XLow, XHigh, YLow, YHigh
 data Rectangle = Rectangle Integer Integer Integer Integer deriving (Show, Eq)

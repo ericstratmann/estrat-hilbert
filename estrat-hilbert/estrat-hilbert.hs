@@ -60,10 +60,10 @@ buildRectangles _ = []
 
 -- There must be a better way to do this
 force :: HilbertTree -> IO ()
-force tree = when (length (allRects tree) > 1000000000000) putStrLn "oops"
+force tree = when (length (allRects tree) > 1000000000000) $ putStrLn "oops"
 
 force2 :: [Rectangle] -> IO ()
-force2 rects = when (length rects > 10000000000000) putStrLn "oops"
+force2 rects = when (length rects > 10000000000000) $ putStrLn "oops"
 
 split :: Char -> String -> [String]
 split c s
