@@ -100,10 +100,7 @@ compareHilberts (shv1, lhv1) (shv2, lhv2) | lhv1 == lhv2 && shv1 == shv2 = EQ
                                           | otherwise = GT
 
 makeNode :: HilbertTree -> NodeData
-makeNode tree = (mbr, tree, hilberts) where
-    mbr = getNodeMBR tree
-    hilberts = getNodeHilbert tree
-
+makeNode tree = (getNodeMBR tree, tree, getNodeHilbert tree)
 
 fill :: [Rectangle] -> [NodeData]
 fill rects | not $ null rects = (makeNode . Leaf $ take maxLeafSize rects) : fill (drop maxLeafSize rects)
@@ -119,8 +116,7 @@ isLeaf (Leaf _) = True
 isLeaf (Node _) = False
 
 isLeafNode :: NodeData -> Bool
-isLeafNode (_,child,_) | isLeaf child = True
-                       | otherwise = False
+isLeafNode (_,child,_) = isLeaf child
 
 getNodeMBR :: HilbertTree -> Rectangle
 getNodeMBR (Node nodes) = foldl1 calculateMBR $ fmap (\(mbr,_,_) -> mbr) nodes
