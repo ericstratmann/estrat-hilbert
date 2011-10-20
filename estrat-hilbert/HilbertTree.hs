@@ -5,13 +5,13 @@ import Debug.Trace
 
 -- XLow, XHigh, YLow, YHigh
 data Rectangle = Rectangle Integer Integer Integer Integer deriving (Eq)
--- (MBR, Child, LHV)
-type NodeData = (Rectangle, HilbertTree, Integer)
+-- (MBR, Child, (minHilbert, maxHilbert))
+type NodeData = (Rectangle, HilbertTree, (Integer, Integer))
 data HilbertTree = Node [NodeData] | Leaf [Rectangle] deriving (Eq)
 
 
 instance Show HilbertTree where
-    show (Node nodes) = "N[" ++ concatMap (\(_,c,_) -> show c ++ ",") nodes ++ "]"
+    show (Node nodes) = "N[" ++ concatMap (\(r,c,_) -> show (hilbert r) ++ ":" ++ show c ++ ",") nodes ++ "]"
     show (Leaf rects) = "L" ++ show rects
 
 
@@ -24,17 +24,16 @@ r a b c d = Rectangle a b c d
 tr :: [Rectangle]
 tr = [Rectangle 0 1 0 1, Rectangle 1 2 1 2, Rectangle 3 5 3 5, Rectangle 0 4 0 4]
 
-order tree = rall tree == sortBy (comparing hilbert) (rall tree)
+order tree = if (rall tree == sortBy (comparing hilbert) (rall tree)) then True else error ("not ordered\n" ++ show tree)
 
-nodups a = (length $ rall a)  == (length $ group $ rall a)
+ok a = balanced a && allOk a && order a
 
-ok a = nodups a && balanced a && allOk a && order a
-
-allOk (Node ns) = length (ns) <= maxNodeSize && all (\(_,c,_) -> allOk c) ns
-allOk (Leaf rs) = length rs <= maxLeafSize 
+allOk a = if allOk' a  then True else error "too big nodes"
+allOk' (Node ns) = length (ns) <= maxNodeSize && all (\(_,c,_) -> allOk' c) ns
+allOk' (Leaf rs) = length rs <= maxLeafSize 
 
 balanced :: HilbertTree -> Bool 
-balanced tree = 1 >= length (group $  mapDepth 0 tree)
+balanced tree = if (1 >= length (group $  mapDepth 0 tree)) then True else error ("inbalanced" ++ show (tree))
 
 mapDepth :: Int -> HilbertTree -> [Int]
 mapDepth d (Node ns) = (\(_,c,_) -> mapDepth (d+1) c) =<< ns
@@ -63,9 +62,9 @@ buildTree :: [Rectangle] -> HilbertTree
 buildTree =  foldl' insertTree emptyTree
 
 insertTree :: HilbertTree -> Rectangle -> HilbertTree
-insertTree tree rect = if ok a then a else error ("Unbalanced!. Before\n" ++ show tree ++ "\ninsert\n" ++ show rect ++ "\nnow\n" ++ show a)
+insertTree tree rect = a
     where
-    a = trace ("\n\nNEW INSERT\n\n") (newRoot newTree split)
+    a = newRoot newTree split
     (newTree, split) = insertTree' tree rect
     
 searchTree :: HilbertTree -> Rectangle -> [Rectangle]
@@ -79,24 +78,24 @@ searchTree (Leaf leafs) rect = searchTree'' =<< leafs where
 ---- Private functions
     
 newRoot :: HilbertTree -> Maybe NodeData -> HilbertTree
-newRoot tree (Just newNode) = Node [makeNode tree, makeNode (Node [newNode])]
+newRoot tree (Just newNode) = Node $ sortBy compareNodeHilberts [makeNode tree, makeNode $ Node [newNode]]
 newRoot tree Nothing = tree
 
 insertTree' :: HilbertTree -> Rectangle -> (HilbertTree, Maybe NodeData)
-insertTree' (Node []) rect = (Node [(rect, Leaf [rect], hilbert rect)], Nothing)
-insertTree' (Node nodes) rect = trace (out ++ out2) (Node f1, f2) where
-    out = "\n\nbefore overflow: \n" ++ show newTree ++ "\nsplit:\n" ++ show split
-    out2 = "\nafter:\n" ++ show (Node f1) ++ "split:\n" ++ show f2
+insertTree' (Node []) rect = (Node [(rect, Leaf [rect], (hilbert rect, hilbert rect))], Nothing)
+insertTree' (Node nodes) rect = (Node f1, grow best f2) where
     (f1, f2) = handleOverflow siblings (makeNode newTree) split
     siblings = getSiblings nodes b
     (newTree, split) = insertTree' best rect 
     b@(_,best,_) = findBestNode nodes (hilbert rect)
 insertTree' leaf rect = (insertLeaf leaf rect, Nothing)
 
+grow :: HilbertTree -> Maybe NodeData -> Maybe NodeData
+grow _ x = x
 
 -- Inserts the rectangle into the Leaf. May cause overflow which will be fixed later
 insertLeaf :: HilbertTree -> Rectangle -> HilbertTree
-insertLeaf (Leaf rects) rect = if (any (==rect) rects) then Leaf rects else Leaf (sortBy (comparing hilbert) (rect:rects))
+insertLeaf (Leaf rects) rect = Leaf (sortBy (comparing hilbert) (rect:rects))
 
 --fix (a,b) c = trace (s "vvvvv" ++ s a ++ s b ++ s c ++ s "^^^^^^^") (fix' (a,b) c)
 
@@ -114,33 +113,51 @@ handleOverflow siblings node Nothing | isLeafNode node = handleOverflowLeaf node
                                      | otherwise = handleOverflowNode Nothing (node:siblings)
 
 handleOverflowNode :: Maybe NodeData -> [NodeData] -> ([NodeData], Maybe NodeData)
-handleOverflowNode Nothing siblings = (siblings, Nothing)
+handleOverflowNode Nothing siblings = (sorted, Nothing)
+    where sorted = sortBy compareNodeHilberts siblings
+handleOverflowNode (Just newNode) nodes | length allNodes  <= capacity = (distributed, Nothing)
+                                        | otherwise = (first, new)
     where
-    sorted2 = sortBy (comparing (hilbert . getRect)) (siblings)
-handleOverflowNode (Just newNode) siblings | length siblings == maxNodeSize = (first, new)
-                                           | otherwise = (sorted, Nothing)
-    where
-    first = init sorted
-    new = Just (last sorted)
-    sorted = siblings ++ [newNode]
+    capacity = length nodes * maxNodeSize
+    first = init distributed
+    new = Just (last distributed)
+    allNodes = newNode : getChildren nodes
+    sorted = sortBy compareNodeHilberts allNodes
+    distributed = fillD sorted
+
+getChildren = concatMap (\(_,Node ns,_) -> ns) 
+
+fillD :: [NodeData] -> [NodeData]
+fillD nodes | not $ null nodes = (makeNode . Node $ take maxNodeSize nodes) : fillD (drop maxLeafSize nodes)
+fillD _ = []
 
 
 getRect :: NodeData -> Rectangle
 getRect (rect,_,_) = rect
 
 handleOverflowLeaf :: NodeData -> [NodeData] -> ([NodeData], Maybe NodeData)
-handleOverflowLeaf node siblings | not full = trace (show (node:siblings)) (allNodes, Nothing)
+handleOverflowLeaf node siblings | not full = (allNodes, Nothing)
                                  | numRects <= capacity = (distributed, Nothing)
-                                 | otherwise = trace (show oldNodes) (handleOverflowNode (Just newNode) oldNodes)
+                                 | otherwise = (oldNodes, Just newNode)
     where
     full = any (\(_,Leaf rs,_) -> length rs > maxLeafSize) allNodes
-    allNodes = sortBy (comparing (\(_,_,l) -> l)) (node:siblings)
+    allNodes = sortBy (compareNodeHilberts) (node:siblings)
     allRects = sortBy (comparing hilbert) (getAllRects allNodes)
     numRects = length allRects
     capacity = getCapacity allNodes
     newNode = last distributed
     oldNodes = init distributed
     distributed = (fill allRects)
+
+compareNodeHilberts :: NodeData -> NodeData -> Ordering
+compareNodeHilberts (_,_,h1) (_,_,h2) = compareHilberts h1 h2
+
+compareHilberts :: (Integer, Integer) -> (Integer, Integer) -> Ordering 
+compareHilberts (shv1, lhv1) (shv2, lhv2) | lhv1 == lhv2 && shv1 == shv2 = EQ
+                                          | lhv1 < lhv2 = LT
+                                          | lhv1 > lhv2 = GT
+                                          | shv1 < shv2 = LT
+                                          | otherwise = GT
 
 makeNode :: HilbertTree -> NodeData
 makeNode tree = fixNode (undefined, tree, undefined)
@@ -150,8 +167,8 @@ fill rects | not $ null rects = (makeNode . Leaf $ take maxLeafSize rects) : fil
 fill _ = []
 
 update :: [NodeData] -> NodeData -> HilbertTree -> [NodeData]
-update (n:ns) node@(rect, _, lhv) tree | n == node = (rect, tree, lhv) : update ns node tree
-                                       | otherwise = node : update ns node tree 
+update (n:ns) node@(rect, _, (shv, lhv)) tree | n == node = (rect, tree, (shv, lhv)) : update ns node tree
+                                              | otherwise = node : update ns node tree 
 update [] _ _ = []
 
 getSiblings :: [NodeData] -> NodeData -> [NodeData]
@@ -181,20 +198,23 @@ getCapacity nodes = length nodes * maxLeafSize
 
 
 fixNode :: NodeData -> NodeData
-fixNode (_, child, _) = (mbr, child, lhv) where
+fixNode (_, child, _) = (mbr, child, hilberts) where
     mbr = getNodeMBR child
-    lhv = getNodeLHV child
+    hilberts = getNodeHilbert child
 
 getNodeMBR :: HilbertTree -> Rectangle
 getNodeMBR (Node nodes) = foldl1 calculateMBR $ fmap (\(mbr,_,_) -> mbr) nodes
 getNodeMBR (Leaf rects) = foldl1 calculateMBR rects
 
-getNodeLHV :: HilbertTree -> Integer
-getNodeLHV (Node nodes) = maximum $ fmap (\(_,_,lhv) -> lhv) nodes
-getNodeLHV (Leaf rects) = maximum $ fmap hilbert rects
+getNodeHilbert :: HilbertTree -> (Integer, Integer)
+getNodeHilbert (Node nodes) = (min, max)
+    where min = minimum $ fmap (\(_,_,(shv,_)) -> shv) nodes
+          max = maximum $ fmap (\(_,_,(_,lhv)) -> lhv) nodes
+getNodeHilbert (Leaf rects) = (minimum hilberts, maximum hilberts)
+    where hilberts = fmap hilbert rects
 
-findBestNode (n@(_,_,h):n2:ns) hi | h > hi = n
-                               | otherwise = findBestNode (n2:ns) hi
+findBestNode (n@(_,_,(_,h)):n2:ns) hi | h > hi = n
+                                      | otherwise = findBestNode (n2:ns) hi
 findBestNode [n] _ = n
 
 
@@ -223,6 +243,5 @@ hilbert' d x y = dist (2^(d-1)) (2^(2*(d-1))) 0 x y where
         where newDist = div side 2
               newArea = div area 4
         
-
 center :: Rectangle -> (Integer, Integer)
 center (Rectangle xl xh yl yh) = (div (xh+xl) 2, div (yh+yl) 2)
