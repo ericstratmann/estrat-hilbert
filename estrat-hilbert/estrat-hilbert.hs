@@ -1,13 +1,30 @@
 import HilbertTree
 import System.Environment
+import System.CPUTime
 
 main :: IO ()
 main = do
+    start <- getCPUTime
     fileRectangles <- readRectanglesFile
-    inputRectangles <- readRectanglesStdin
     let tree = buildTree fileRectangles
-    let _n = fmap (searchTree tree) inputRectangles
+    seq tree $ return ()
+    end <- getCPUTime
+    putStrLn $ show (length fileRectangles) ++ " rectangles read in " ++ getTimeDiff start end
+    inputRectangles <- readRectanglesStdin
+    mapM_ (findIntersections tree) inputRectangles
     return ()
+
+findIntersections :: HilbertTree -> Rectangle -> IO ()
+findIntersections tree rect = do
+    start <- getCPUTime
+    let rects = searchTree tree rect
+    seq rects $ return ()
+    end <- getCPUTime
+    putStrLn $ "found " ++ show (length rects) ++ " matches in " ++ getTimeDiff start end
+    mapM_ (\r -> putStrLn $ show r ++ "\n") (take 4 rects)
+
+getTimeDiff :: Integer -> Integer -> String
+getTimeDiff start end = show(div (end-start) 1000000000)  ++ " microseconds"
 
 readRectanglesStdin :: IO [Rectangle]
 readRectanglesStdin = do
@@ -27,10 +44,10 @@ readRectanglesFile = do
             return rectangles
 
 parseRectangles :: String -> [Rectangle]
-parseRectangles rects = buildRectangles $ fmap read $ split ',' rects
+parseRectangles rects = buildRectangles $ fmap read $ split ',' $ map (\c -> if c == '\n' then ',' else c) rects
 
 buildRectangles :: [Integer] -> [Rectangle]
-buildRectangles (x1:y1:x2:y2:x3:y3:x4:y4:_:rest) = Rectangle xMin xMax yMin yMax : buildRectangles rest
+buildRectangles (x1:y1:x2:y2:x3:y3:x4:y4:rest) = Rectangle xMin xMax yMin yMax : buildRectangles rest
     where
     xMin = foldl1 min xs
     xMax = foldl1 max xs
