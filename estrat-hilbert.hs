@@ -1,18 +1,13 @@
 import HilbertTree
 import System.Environment
 
-
 main :: IO ()
 main = do
     fileRectangles <- readRectanglesFile
     inputRectangles <- readRectanglesStdin
     let tree = buildTree fileRectangles
-    let _n = map (searchTree tree) inputRectangles
+    let _n = fmap (searchTree tree) inputRectangles
     return ()
-
-
-findRectangles :: HilbertTree -> [Rectangle] -> IO ()
-findRectangles tree rects = return ()
 
 readRectanglesStdin :: IO [Rectangle]
 readRectanglesStdin = do
@@ -31,15 +26,18 @@ readRectanglesFile = do
             let rectangles = parseRectangles input
             return rectangles
 
-replaceNewLines :: Char -> Char
-replaceNewLines c | c == '\n' = ','
-                  | otherwise = c
-
 parseRectangles :: String -> [Rectangle]
-parseRectangles rects = buildRectangles $ map read $ split ',' $ map replaceNewLines rects
+parseRectangles rects = buildRectangles $ fmap read $ split ',' rects
 
 buildRectangles :: [Integer] -> [Rectangle]
-buildRectangles (w:x:y:z:rest) = (Rectangle w x y z) : buildRectangles rest
+buildRectangles (x1:y1:x2:y2:x3:y3:x4:y4:_:rest) = Rectangle xMin xMax yMin yMax : buildRectangles rest
+    where
+    xMin = foldl1 min xs
+    xMax = foldl1 max xs
+    yMin = foldl1 min ys
+    yMax = foldl1 max ys
+    xs = [x1, x2, x3, x4]
+    ys = [y1, y2, y3, y4]
 buildRectangles _ = []
 
 split :: Char -> String -> [String]

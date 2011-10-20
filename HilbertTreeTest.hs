@@ -1,6 +1,14 @@
 import Test.QuickCheck
 import Control.Monad
 import HilbertTree
+import Text.Printf
+
+
+main = do
+    q "Rect intersect self" p1
+    q "Search tree" p2
+
+q s p = putStrLn s >> quickCheck p
 
 instance Arbitrary Rectangle where
     arbitrary = do
@@ -21,6 +29,8 @@ instance Arbitrary HilbertTree where
         rects <- listOf arbitrary
         return $ buildTree rects
 
-prop_same_rects_intersect rect = intersects rect rect
+p1 rect = intersects rect rect
 
-prop_rect_search tree rect = rect `elem` searchTree (insertTree tree rect) rect
+p2 tree = balanced tree
+
+p3 tree rect = rect `elem` searchTree (insertTree tree rect) rect
