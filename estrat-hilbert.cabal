@@ -10,3 +10,9 @@ Executable estrat-hilbert
   build-depends:  base, containers
   Hs-Source-Dirs: estrat-hilbert
   ghc-options: -Wall -O2
+
+Executable estrat-hilbert-test
+  Main-Is: HilbertTreeTest.hs
+  build-depends:  base, containers, QuickCheck
+  Hs-Source-Dirs: estrat-hilbert
+  ghc-options: -O2

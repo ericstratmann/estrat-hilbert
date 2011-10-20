@@ -1,2 +1,10 @@
 estrat-hilbert uses Hibert R-trees to provide efficient lookup for rectangles.
 Its author is Eric Stratmann (estrat).
+
+You can install it using cabal
+$ cabal install
+$ estrat-hilbert input.txt < query
+
+You can test it with:
+
+$ estrat-hilbert-test
