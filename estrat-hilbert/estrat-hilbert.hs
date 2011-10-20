@@ -7,7 +7,7 @@ main = do
     start <- getCPUTime
     fileRectangles <- readRectanglesFile
     let tree = buildTree fileRectangles
-    seq tree $ return ()
+    force tree
     end <- getCPUTime
     putStrLn $ show (length fileRectangles) ++ " rectangles read in " ++ getTimeDiff start end
     inputRectangles <- readRectanglesStdin
@@ -18,7 +18,7 @@ findIntersections :: HilbertTree -> Rectangle -> IO ()
 findIntersections tree rect = do
     start <- getCPUTime
     let rects = searchTree tree rect
-    seq rects $ return ()
+    force2 rects 
     end <- getCPUTime
     putStrLn $ "found " ++ show (length rects) ++ " matches in " ++ getTimeDiff start end
     mapM_ (\r -> putStrLn $ show r ++ "\n") (take 4 rects)
@@ -56,6 +56,13 @@ buildRectangles (x1:y1:x2:y2:x3:y3:x4:y4:rest) = Rectangle xMin xMax yMin yMax :
     xs = [x1, x2, x3, x4]
     ys = [y1, y2, y3, y4]
 buildRectangles _ = []
+
+-- There must be a better way to do this
+force :: HilbertTree -> IO ()
+force tree = if length (allRects tree) > 1000000000000 then putStrLn "oops" else return ()
+
+force2 :: [Rectangle] -> IO ()
+force2 rects = if length rects > 10000000000000 then putStrLn "oops" else return ()
 
 split :: Char -> String -> [String]
 split c s
