@@ -6,11 +6,13 @@ import Data.Ord
 
 
 main = do
-    q "Rect intersect self" p1
+    q "Don't find bogus rectangle" p1
     q "Search tree" p2
     q "Tree is in order" p3
     q "Tree is balanced" p4
     q "Nodes/Leaves aren't too big" p5
+    q "Find dups" p6
+    q "MBR matches all in tree" p7
 
 q s p = putStrLn s >> quickCheck p
 
@@ -33,7 +35,7 @@ instance Arbitrary HilbertTree where
         rects <- listOf arbitrary
         return $ buildTree rects
 
-p1 rect = intersects rect rect
+p1 tree = 0 == length (searchTree tree (Rectangle (-2) (-1) (-2) (-1)))
 
 p2 tree rect = rect `elem` searchTree (insertTree tree rect) rect
 
@@ -42,6 +44,15 @@ p3 tree = allRects tree == sortBy (comparing hilbert) (allRects tree)
 p4 tree = 1 >= length (group $ mapDepth 0 tree)
 
 p5 = checkSize
+
+p6 tree rect = 2 <= length (searchTree newTree rect)
+    where newTree = insertTree (insertTree tree rect) rect
+
+p7 tree rects = and $ map (`elem` results) rects
+    where
+    results = searchTree newTree mbr
+    mbr = foldl1' calculateMBR rects
+    newTree = foldl' insertTree tree rects
 
 checkSize (Node ns) = length ns <= maxNodeSize && all (\(_,c,_) -> checkSize c) ns
 checkSize (Leaf rs) = length rs <= maxLeafSize 
