@@ -64,27 +64,22 @@ handleOverflowNode :: Maybe NodeData -> [NodeData] -> ([NodeData], Maybe NodeDat
 handleOverflowNode Nothing siblings = (sorted, Nothing)
     where sorted = sortBy compareNodeHilberts siblings
 handleOverflowNode (Just newNode) nodes | length allNodes  <= capacity = (distributed, Nothing)
-                                        | otherwise = (first, new)
+                                        | otherwise = (init distributed, Just $ last distributed)
     where
     capacity = length nodes * maxNodeSize
-    first = init distributed
-    new = Just (last distributed)
     allNodes = newNode : getChildren nodes
-    sorted = sortBy compareNodeHilberts allNodes
-    distributed = fillD sorted
+    distributed = fillD $ sortBy compareNodeHilberts allNodes
 
 handleOverflowLeaf :: NodeData -> [NodeData] -> ([NodeData], Maybe NodeData)
 handleOverflowLeaf node siblings | not full = (allNodes, Nothing)
                                  | numRects <= capacity = (distributed, Nothing)
-                                 | otherwise = (oldNodes, Just newNode)
+                                 | otherwise = (init distributed, Just $ last distributed)
     where
     full = any (\(_,Leaf rs,_) -> length rs > maxLeafSize) allNodes
     allNodes = sortBy compareNodeHilberts (node:siblings)
     rects = sortBy (comparing hilbert) (allRects $ Node allNodes)
     numRects = length rects
     capacity = length allNodes * maxLeafSize
-    newNode = last distributed
-    oldNodes = init distributed
     distributed = fill rects
 
 getChildren :: [NodeData] -> [NodeData]
