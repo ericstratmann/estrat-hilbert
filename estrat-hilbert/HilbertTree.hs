@@ -28,9 +28,7 @@ buildTree :: [Rectangle] -> HilbertTree
 buildTree =  foldl' insertTree emptyTree
 
 insertTree :: HilbertTree -> Rectangle -> HilbertTree
-insertTree tree rect = newRoot newTree split
-    where
-    (newTree, split) = insertTree' tree rect
+insertTree tree rect = uncurry newRoot (insertTree' tree rect)
     
 searchTree :: HilbertTree -> Rectangle -> [Rectangle]
 searchTree (Node nodes) rect = searchTree' =<< nodes where
