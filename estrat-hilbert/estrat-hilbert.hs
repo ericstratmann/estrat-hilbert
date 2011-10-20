@@ -1,6 +1,7 @@
 import HilbertTree
 import System.Environment
 import System.CPUTime
+import Control.Monad
 
 main :: IO ()
 main = do
@@ -44,25 +45,25 @@ readRectanglesFile = do
             return rectangles
 
 parseRectangles :: String -> [Rectangle]
-parseRectangles rects = buildRectangles $ fmap read $ split ',' $ map (\c -> if c == '\n' then ',' else c) rects
+parseRectangles rects = buildRectangles $ fmap read $ split ',' $ fmap (\c -> if c == '\n' then ',' else c) rects
 
 buildRectangles :: [Integer] -> [Rectangle]
 buildRectangles (x1:y1:x2:y2:x3:y3:x4:y4:rest) = Rectangle xMin xMax yMin yMax : buildRectangles rest
     where
-    xMin = foldl1 min xs
-    xMax = foldl1 max xs
-    yMin = foldl1 min ys
-    yMax = foldl1 max ys
+    xMin = minimum xs
+    xMax = maximum xs
+    yMin = minimum ys
+    yMax = maximum ys
     xs = [x1, x2, x3, x4]
     ys = [y1, y2, y3, y4]
 buildRectangles _ = []
 
 -- There must be a better way to do this
 force :: HilbertTree -> IO ()
-force tree = if length (allRects tree) > 1000000000000 then putStrLn "oops" else return ()
+force tree = when (length (allRects tree) > 1000000000000) putStrLn "oops"
 
 force2 :: [Rectangle] -> IO ()
-force2 rects = if length rects > 10000000000000 then putStrLn "oops" else return ()
+force2 rects = when (length rects > 10000000000000) putStrLn "oops"
 
 split :: Char -> String -> [String]
 split c s

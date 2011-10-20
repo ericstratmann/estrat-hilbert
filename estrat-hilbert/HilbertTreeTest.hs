@@ -41,9 +41,9 @@ p3 tree = allRects tree == sortBy (comparing hilbert) (allRects tree)
 
 p4 tree = 1 >= length (group $ mapDepth 0 tree)
 
-p5 tree = checkSize tree
+p5 = checkSize
 
-checkSize (Node ns) = length (ns) <= maxNodeSize && all (\(_,c,_) -> checkSize c) ns
+checkSize (Node ns) = length ns <= maxNodeSize && all (\(_,c,_) -> checkSize c) ns
 checkSize (Leaf rs) = length rs <= maxLeafSize 
 
 mapDepth :: Int -> HilbertTree -> [Int]
