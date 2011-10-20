@@ -14,10 +14,10 @@ maxRectCoord :: Int
 maxRectCoord = 66536 
 
 maxLeafSize :: Int
-maxLeafSize = 2
+maxLeafSize = 4
 
 maxNodeSize :: Int
-maxNodeSize = 3
+maxNodeSize = 4
 
 ---- Public functions
 
