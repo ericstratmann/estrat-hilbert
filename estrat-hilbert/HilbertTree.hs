@@ -1,6 +1,7 @@
 module HilbertTree where
 import Data.List
 import Data.Ord
+import Control.Monad
 
 -- XLow, XHigh, YLow, YHigh
 data Rectangle = Rectangle Integer Integer Integer Integer deriving (Show, Eq)
@@ -41,7 +42,7 @@ searchTree (Leaf leafs) rect = searchTree'' =<< leafs where
 ---- Private functions
     
 newRoot :: HilbertTree -> Maybe NodeData -> HilbertTree
-newRoot tree (Just newNode) = Node $ sortBy compareNodeHilberts [makeNode tree, makeNode $ Node [newNode]]
+newRoot tree (Just newNode) = Node $ sortBy compareNodeHilberts $ liftM makeNode [tree, Node [newNode]]
 newRoot tree Nothing = tree
 
 insertTree' :: HilbertTree -> Rectangle -> (HilbertTree, Maybe NodeData)
