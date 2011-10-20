@@ -10,10 +10,11 @@ data HilbertTree = Node [NodeData] | Leaf [Rectangle] deriving (Show, Eq)
 
 ---- Constants
 
-maxRectCoord = 66536
+maxRectCoord :: Int
+maxRectCoord = 66536 
 
 maxLeafSize :: Int
-maxLeafSize = 3
+maxLeafSize = 2
 
 maxNodeSize :: Int
 maxNodeSize = 3
@@ -27,15 +28,14 @@ buildTree :: [Rectangle] -> HilbertTree
 buildTree =  foldl' insertTree emptyTree
 
 insertTree :: HilbertTree -> Rectangle -> HilbertTree
-insertTree tree rect = a
+insertTree tree rect = newRoot newTree split
     where
-    a = newRoot newTree split
     (newTree, split) = insertTree' tree rect
     
 searchTree :: HilbertTree -> Rectangle -> [Rectangle]
 searchTree (Node nodes) rect = searchTree' =<< nodes where
     searchTree' (rect2, tree, _) | intersects rect rect2 = searchTree tree rect
-                                   | otherwise = []
+                                 | otherwise = []
 searchTree (Leaf leafs) rect = searchTree'' =<< leafs where
     searchTree'' rect2 | intersects rect rect2 = [rect2]
                        | otherwise = []
@@ -48,27 +48,13 @@ newRoot tree Nothing = tree
 
 insertTree' :: HilbertTree -> Rectangle -> (HilbertTree, Maybe NodeData)
 insertTree' (Node []) rect = (Node [(rect, Leaf [rect], (hilbert rect, hilbert rect))], Nothing)
-insertTree' (Node nodes) rect = (Node f1, f2) where
-    (f1, f2) = handleOverflow siblings (makeNode newTree) split
+insertTree' (Node nodes) rect = (Node retNodes, retSplit)
+    where
+    (retNodes, retSplit) = handleOverflow siblings (makeNode newTree) split
     siblings = getSiblings nodes b
     (newTree, split) = insertTree' best rect 
     b@(_,best,_) = findBestNode nodes (hilbert rect)
-insertTree' leaf rect = (insertLeaf leaf rect, Nothing)
-
--- Inserts the rectangle into the Leaf. May cause overflow which will be fixed later
-insertLeaf :: HilbertTree -> Rectangle -> HilbertTree
-insertLeaf (Leaf rects) rect = Leaf (sortBy (comparing hilbert) (rect:rects))
-insertLeaf _ _ = error "insertLeaf expects leaf"
-
---fix (a,b) c = trace (s "vvvvv" ++ s a ++ s b ++ s c ++ s "^^^^^^^") (fix' (a,b) c)
-
-getRectCount :: HilbertTree -> Int
-getRectCount (Node nodes) = sum $ fmap (\(_,t,_) -> getRectCount t) nodes
-getRectCount (Leaf rects) = length rects
-           
-isOverflow :: HilbertTree -> Bool
-isOverflow (Node nodes) = length nodes > maxNodeSize
-isOverflow (Leaf rects) = length rects > maxLeafSize
+insertTree' (Leaf rects) rect = (Leaf $ sortBy (comparing hilbert) (rect:rects), Nothing)
 
 handleOverflow :: [NodeData] -> NodeData -> Maybe NodeData -> ([NodeData], Maybe NodeData)
 handleOverflow siblings node split@(Just _) = handleOverflowNode split (node:siblings)
@@ -88,17 +74,6 @@ handleOverflowNode (Just newNode) nodes | length allNodes  <= capacity = (distri
     sorted = sortBy compareNodeHilberts allNodes
     distributed = fillD sorted
 
-getChildren :: [NodeData] -> [NodeData]
-getChildren = (=<<) (\(_,Node ns,_) -> ns) 
-
-fillD :: [NodeData] -> [NodeData]
-fillD nodes | not $ null nodes = (makeNode . Node $ take maxNodeSize nodes) : fillD (drop maxLeafSize nodes)
-fillD _ = []
-
-
-getRect :: NodeData -> Rectangle
-getRect (rect,_,_) = rect
-
 handleOverflowLeaf :: NodeData -> [NodeData] -> ([NodeData], Maybe NodeData)
 handleOverflowLeaf node siblings | not full = (allNodes, Nothing)
                                  | numRects <= capacity = (distributed, Nothing)
@@ -106,12 +81,19 @@ handleOverflowLeaf node siblings | not full = (allNodes, Nothing)
     where
     full = any (\(_,Leaf rs,_) -> length rs > maxLeafSize) allNodes
     allNodes = sortBy compareNodeHilberts (node:siblings)
-    rects = sortBy (comparing hilbert) (getAllRects allNodes)
+    rects = sortBy (comparing hilbert) (allRects $ Node allNodes)
     numRects = length rects
-    capacity = getCapacity allNodes
+    capacity = length allNodes * maxLeafSize
     newNode = last distributed
     oldNodes = init distributed
     distributed = fill rects
+
+getChildren :: [NodeData] -> [NodeData]
+getChildren = (=<<) (\(_,Node ns,_) -> ns) 
+
+fillD :: [NodeData] -> [NodeData]
+fillD nodes | not $ null nodes = (makeNode . Node $ take maxNodeSize nodes) : fillD (drop maxLeafSize nodes)
+fillD _ = []
 
 compareNodeHilberts :: NodeData -> NodeData -> Ordering
 compareNodeHilberts (_,_,h1) (_,_,h2) = compareHilberts h1 h2
@@ -124,16 +106,14 @@ compareHilberts (shv1, lhv1) (shv2, lhv2) | lhv1 == lhv2 && shv1 == shv2 = EQ
                                           | otherwise = GT
 
 makeNode :: HilbertTree -> NodeData
-makeNode tree = fixNode (undefined, tree, undefined)
+makeNode tree = (mbr, tree, hilberts) where
+    mbr = getNodeMBR tree
+    hilberts = getNodeHilbert tree
+
 
 fill :: [Rectangle] -> [NodeData]
 fill rects | not $ null rects = (makeNode . Leaf $ take maxLeafSize rects) : fill (drop maxLeafSize rects)
 fill _ = []
-
-update :: [NodeData] -> NodeData -> HilbertTree -> [NodeData]
-update (n:ns) node@(rect, _, (shv, lhv)) tree | n == node = (rect, tree, (shv, lhv)) : update ns node tree
-                                              | otherwise = node : update ns node tree 
-update [] _ _ = []
 
 getSiblings :: [NodeData] -> NodeData -> [NodeData]
 getSiblings (n:ns) node | n == node = getSiblings ns node
@@ -144,27 +124,9 @@ isLeaf :: HilbertTree -> Bool
 isLeaf (Leaf _) = True
 isLeaf (Node _) = False
 
-
 isLeafNode :: NodeData -> Bool
 isLeafNode (_,child,_) | isLeaf child = True
                        | otherwise = False
-
--- children must be leaf nodes
-getAllRects :: [NodeData] -> [Rectangle]
-getAllRects = (=<<) (\(_,c,_) -> getRects c) 
-getRects :: HilbertTree -> [Rectangle]
-getRects (Node _) = error "getRects expects Leaf"
-getRects (Leaf rects) = rects
-
--- children must be leaf nodes
-getCapacity :: [NodeData] -> Int
-getCapacity nodes = length nodes * maxLeafSize
-
-
-fixNode :: NodeData -> NodeData
-fixNode (_, child, _) = (mbr, child, hilberts) where
-    mbr = getNodeMBR child
-    hilberts = getNodeHilbert child
 
 getNodeMBR :: HilbertTree -> Rectangle
 getNodeMBR (Node nodes) = foldl1 calculateMBR $ fmap (\(mbr,_,_) -> mbr) nodes
@@ -197,7 +159,7 @@ allRects (Leaf rs) = rs
 
 hilbert :: Rectangle -> Integer
 hilbert rect = hilbert' d x y where
-    d = ceiling $ logBase 4 (maxRectCoord ** 2)
+    d = ceiling $ logBase 4.0 $ fromIntegral (maxRectCoord * maxRectCoord)
     (x, y) = center rect
 
 -- Adapted from http://www.serpentine.com/blog/2007/01/11/two-dimensional-spatial-hashing-with-space-filling-curves/
