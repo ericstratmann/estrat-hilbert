@@ -25,7 +25,7 @@ findIntersections tree rect = do
     mapM_ (\r -> putStrLn $ show r ++ "\n") (take 4 rects)
 
 getTimeDiff :: Integer -> Integer -> String
-getTimeDiff start end = show(div (end-start) 1000000000)  ++ " microseconds"
+getTimeDiff start end = show(div (end-start) 1000000)  ++ " microseconds"
 
 readRectanglesStdin :: IO [Rectangle]
 readRectanglesStdin = do
